@@ -1,0 +1,57 @@
+
+name: Build DevTerminal English APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download English source
+        run: |
+          curl -fL --retry 3 \
+            "https://github.com/abuhujayfa302-creator/CodePocket/releases/download/devterminal-source-v1/DevTerminal-English-Source-v1.zip" \
+            -o source.zip
+          unzip -q source.zip -d source
+
+      - name: Locate project
+        id: project
+        run: |
+          PROJECT_DIR="$(dirname "$(find source -name settings.gradle.kts -print -quit)")"
+          test -n "$PROJECT_DIR"
+          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Validate source
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: |
+          chmod +x ./gradlew
+          if [ -f tools/selfcheck.py ]; then
+            python3 tools/selfcheck.py
+          fi
+
+      - name: Build APK
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DevTerminal-English-APK
+          path: ${{ steps.project.outputs.dir }}/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+          
